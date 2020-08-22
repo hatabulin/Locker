@@ -1,0 +1,787 @@
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;********************************************************************************
+                      00002 ;                                                                               *
+                      00003 ;       Требования:                                                             *
+                      00004 ;                                                                               *
+                      00005 ;                                                                               *
+                      00006 ;********************************************************************************
+                      00007 ;                                                                               *
+                      00008 ;       Замечания:      
+                      00009 ; Контроллер электро-замка с автоматическим режимом закрывания
+                      00010 ;                                                                               *
+                      00011 ;                                                                               *
+                      00012 ;********************************************************************************
+                      00013 
+                      00014         list            p=16f84a        ; Директива определения типа контроллера
+                      00015         #include        <p16f84a.inc>   ; Подключаем стандартный файл заголовка MPLAB
+                      00001         LIST
+                      00002 ; P16F84A.INC  Standard Header File, Version 2.00    Microchip Technology, Inc.
+                      00134         LIST
+                      00016         radix           hex             ; Формат чисел по умолчанию - шестнадцатиричный
+                      00017         
+                      00018 ;------------------------------------------------------------------------------
+                      00019         ;Задание слова конфигурации (соответствия аббревиатур битам
+                      00020         ;                            см. в файле p16F84.inc)
+                      00021 
+                      00022         ;__CONFIG _CP_OFF & _WDT_OFF & _PWRTE_ON
+                      00023 
+                      00024 ;------------------------------------------------------------------------------
+                      00025 
+                      00026 ;               --- КОНСТАНТЫ ---
+                      00027 
+                      00028 ;------------------------------------------------------------------------------
+                      00029 
+                      00030 ;               --- МАКРОКОМАНДЫ ---
+                      00031 
+                      00032 ;______________________________________________________________________________
+                      00033 ; ПИНЫ ПОРТА <PORTB>
+  00000000            00034 LED2    equ     0;      pin6
+  00000001            00035 LED1    equ     1;      pin7
+  00000005            00036 POWER_UP        equ     5;      
+  00000002            00037 MOSFET_RELAY    equ     2;      pin9
+  00000003            00038 BUZZER  equ     3;      pin10
+  00000004            00039 BUZZER2 equ     4
+                      00040 
+                      00041 ; ПИНЫ ПОРТА <PORTA>
+  00000000            00042 KEY2    equ     0;      pin17
+  00000001            00043 KEY1    equ     1;      pin18
+  00000003            00044 KEY3    equ     3;      pin1
+  00000002            00045 SENSE1  equ     2;      pin3
+                      00046 
+                      00047 
+  00000005            00048 AUTOMATIC_TIME_1        equ     5;      Время на закрытие двери
+                      00049 ;--------
+                      00050 ; Start of available RAM.
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00051 ;--------
+                      00052         cblock  0x20
+  00000020            00053                 safe_w          ;not really temp, used by interrupt svc
+  00000021            00054                 safe_s          ;not really temp, used by interrupt svc
+                      00055 
+  00000022            00056                 temp1,temp2,temp3,temp_time,temp_snd,temp_snd2
+  00000028            00057                 STATE
+  00000029            00058                 keys
+                      00059 
+  0000002A            00060                 bigtick_dbl     ;incremented each interrupt
+  0000002B            00061                 bigtick_hi
+  0000002C            00062                 bigtick_lo
+  0000002D            00063                 tick            ;used by delay
+                      00064         endc
+                      00065 
+                      00066 ;               --- ПУСК ---
+                      00067 
+0000                  00068                 ORG     0               ; Вектор сброса - с этого адреса PIC
+                      00069                                         ; начинает выполнение программы
+0000   281D           00070 Reset   goto    Begin           ; Безусловный переход на начало основной программы
+                      00071                                         ; (обходим обработчик прерываний и подпрограммы)
+                      00072 
+                      00073 ;------------------------------------------------------------------------------
+                      00074 ;               --- ОБРАБОТЧИК ПРЕРЫВАНИЙ ---
+                      00075 
+                      00076 ;               ORG     4                       ; Вектор прерываний - переход по этому адресу
+                      00077 ;                                               ; осуществляется аппаратно при установке флага
+                      00078 ;                                               ; запроса на любое незамаскированное прерывание,
+                      00079 ;                                               ; при этом аппаратно сбрасывается бит GIE
+                      00080 ;
+                      00081 ;Interrupt      movwf   safe_w                  ; Сохранение контекста - содержимого регистров
+                      00082 ;               movf    STATUS,W                ; W и STATUS, потому что оно может измениться
+                      00083 ;               movwf   safe_s                  ; в процессе работы обработчика прерываний
+                      00084 ;
+                      00085 ;               clrwdt
+                      00086 
+                      00087 
+                      00088 ;               Здесь будет располагаться сама подпрограмма обработки прерываний
+                      00089 
+                      00090 ;End_int        movf    safe_s,W                ; Восстанавливаем контекст
+                      00091 ;               movwf   STATUS  
+                      00092 ;               swapf   safe_w,F                ; Тут приходится хитрить, чтобы сохранить бит Z в STATUS
+                      00093 ;               swapf   safe_w,W                ; (movf его может изменить, а swapf - нет)
+                      00094 ;               retfie                          ; Возврат из обработчика с установкой бита GIE
+                      00095 
+                      00096 
+                      00097 
+0001                  00098 Ram_init
+0001   30FC           00099                 movlw   0xFC
+0002   00AA           00100                 movwf   bigtick_dbl
+                      00101 
+0003   3000           00102                 movlw   0x00
+0004   00A8           00103                 movwf   STATE
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0005   3400           00104                 retlw   0
+                      00105 ;--------
+                      00106 ; unused pins I am setting to be outputs
+                      00107 ;--------
+0006                  00108 Port_init       
+0006   1303           00109                 bcf             STATUS,RP1
+0007   1283           00110                 bcf             STATUS,RP0
+                      00111 
+0008   0185           00112                 clrf    PORTA
+0009   0186           00113                 clrf    PORTB
+                      00114 
+                      00115 ;               movlw   0x07
+                      00116 ;               movwf   CMCON
+                      00117 ;               movlw   0x00
+                      00118 ;               movwf   VRCON
+                      00119 
+000A   1303           00120                 bcf             STATUS,RP1
+000B   1683           00121                 bsf             STATUS,RP0
+                      00122 
+000C   30FF           00123                 movlw   b'11111111'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+000D   0085           00124                 movwf   TRISA
+                      00125      
+000E   3000           00126                 movlw   0x00
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+000F   0086           00127                 movwf   TRISB
+                      00128 
+0010   1303           00129                 bcf             STATUS,RP1              ; Выбираем банк0 регистров ОЗУ,
+0011   1283           00130                 bcf             STATUS,RP0              ; обнуляя биты выбора банков в регистре STATUS
+                      00131                 
+0012                  00132 Port_reset
+0012   0186           00133                 clrf    PORTB           
+0013   3400           00134                 retlw   0
+                      00135 
+                      00136 ;--------
+                      00137 ; get timer-based interrupts going
+                      00138 ;--------
+0014                  00139 Timer_init      
+0014   110B           00140                 bcf     INTCON,2        ;clear TMR0 int flag
+0015   138B           00141                 bcf     INTCON,7        ;disable global interrupts
+0016   128B           00142                 bcf     INTCON,5        ;disable TMR0 int
+0017   0181           00143                 clrf    TMR0            ;clear timer
+0018   0064           00144                 clrwdt                  ;why is this needed? just do it..
+                      00145 ;               movlw   b'11011000'     ;set up timer. prescaler(bit3)bypassed 
+                      00146 ;               option                  ;send w to option. generate warning.
+                      00147                 
+0019   30C8           00148                 movlw   B'11001000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+001A   0081           00149                 movwf   OPTION_REG
+                      00150 
+                      00151 ;               BCF     OPTION_REG,7    ;разрешены Pull up резисторы на порту B (~200K)
+                      00152 
+                      00153 ;               MOVLW   0 ;0x90; B'10010000'
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00154 ;        MOVWF  INTCON          ;прерывания не используются
+                      00155 ;                MOVLW   0x15            ;настройка таймера 1
+                      00156 ;                MOVWF   T1CON
+                      00157 
+                      00158 ;                MOVLW   0x0B            ;настройка модуля для сброса таймера 1
+                      00159 ;                MOVWF   CCP1CON; 00001011
+                      00160 
+                      00161 ;                MOVLW   0x64
+                      00162 ;                MOVWF   CCPR1L;01100100
+                      00163 
+                      00164 ;                MOVLW   0x57
+                      00165 ;                MOVWF   CCPR1H;
+                      00166 
+                      00167 
+                      00168 
+001B   3400           00169                 retlw   0
+                      00170 
+                      00171 ;------------------------------------------------------------------------------
+                      00172 ;               --- ОСНОВНАЯ ПРОГРАММА ---
+                      00173 
+001C                  00174 Const_init
+001C   0008           00175                 return
+                      00176 
+001D                  00177 Begin   
+001D   1303           00178                 bcf             STATUS,RP1              ; Выбираем банк0 регистров ОЗУ,
+001E   1283           00179                 bcf             STATUS,RP0              ; обнуляя биты выбора банков в регистре STATUS
+                      00180 
+001F   2006           00181                 call    Port_init
+0020   2001           00182                 call    Ram_init
+0021   201C           00183                 call    Const_init
+                      00184 
+                      00185 ;
+                      00186 ; ТЕСТ звуковой и мигание диодов
+                      00187 ;
+0022   1905           00188                 btfsc   PORTA,SENSE1
+0023   2059           00189                 call    SENSE1_OK
+                      00190 
+0024   20A5           00191                 call    BEEP2
+0025   20DB           00192                 call    DELAY_250MS
+0026   1486           00193                 bsf             PORTB,LED1
+0027   1406           00194                 bsf             PORTB,LED2
+                      00195 
+0028   209A           00196                 call    BEEP1
+0029   20DB           00197                 call    DELAY_250MS
+002A   1086           00198                 bcf             PORTB,LED1
+002B   1006           00199                 bcf             PORTB,LED2
+                      00200 
+002C   209A           00201                 call    BEEP1
+002D   20DB           00202                 call    DELAY_250MS
+002E   1486           00203                 bsf             PORTB,LED1
+002F   1406           00204                 bsf             PORTB,LED2
+                      00205 
+0030   20B2           00206                 call    BEEP3
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0031   1086           00207                 bcf             PORTB,LED1
+0032   1006           00208                 bcf             PORTB,LED2
+                      00209 
+0033   1106           00210                 bcf             PORTB,MOSFET_RELAY
+0034   1286           00211                 bcf             PORTB,POWER_UP
+                      00212                 
+0035   20CA           00213                 call    DELAY_500MKS
+0036   1486           00214                 bsf             PORTB,LED1
+0037   1406           00215                 bsf             PORTB,LED2
+                      00216 
+0038   20CA           00217                 call    DELAY_500MKS
+0039   1086           00218                 bcf             PORTB,LED1
+003A   1006           00219                 bcf             PORTB,LED2
+                      00220 
+003B   20CA           00221                 call    DELAY_500MKS
+003C   1486           00222                 bsf             PORTB,LED1
+003D   1406           00223                 bsf             PORTB,LED2
+                      00224 
+003E   20CA           00225                 call    DELAY_500MKS
+003F   1086           00226                 bcf             PORTB,LED1
+0040   1006           00227                 bcf             PORTB,LED2
+                      00228 
+                      00229 
+                      00230 ;               Здесь будем писать наш код...
+                      00231 
+0041                  00232 Main_Cikl
+0041   0805           00233                 movf    PORTA,0
+0042   00A9           00234                 movwf   keys
+                      00235 
+0043   1CA9           00236                 btfss   keys,KEY1
+0044   204A           00237                 call    OPEN_LOCK
+                      00238 
+0045   1C29           00239                 btfss   keys,KEY2
+0046   2056           00240                 call    CLOSE_LOCK
+                      00241 
+0047   1DA9           00242                 btfss   keys,KEY3
+0048   2062           00243                 call    AUTOMATIC1
+                      00244 
+0049   2841           00245 Wait    goto    Main_Cikl                       ; Зациклиться до сброса (можно написать проcто goto $)
+                      00246 ;
+                      00247 ; ---======########### Коньец программулинки ############=======-------
+                      00248 ;
+                      00249 ;
+                      00250         
+004A                  00251 OPEN_LOCK
+004A   209A           00252                 call    BEEP1
+004B   1006           00253                 bcf             PORTB,LED2;             выключить LED2
+004C   1028           00254                 bcf             STATE,LED2
+                      00255 
+004D   1486           00256                 bsf             PORTB,LED1;             включить LED1
+004E   14A8           00257                 bsf             STATE,LED1
+                      00258 
+004F   1506           00259                 bsf             PORTB,MOSFET_RELAY
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0050   20DB           00260                 call    DELAY_250MS
+                      00261 
+0051   1686           00262                 bsf             PORTB,POWER_UP
+0052   20DB           00263                 call    DELAY_250MS
+0053   1286           00264                 bcf             PORTB,POWER_UP
+                      00265 
+0054   1106           00266                 bcf             PORTB,MOSFET_RELAY
+0055   0008           00267                 return  
+                      00268 
+0056                  00269 CLOSE_LOCK
+                      00270 
+0056   1D05           00271                 btfss   PORTA,SENSE1
+0057   2859           00272                 goto    SENSE1_OK
+                      00273 
+0058   2886           00274                 goto    SOUND_SENSE_ERROR
+                      00275 
+0059                  00276 SENSE1_OK               
+0059   209A           00277                 call    BEEP1
+                      00278 
+005A   1086           00279                 bcf             PORTB,LED1
+005B   10A8           00280                 bcf             STATE,LED1
+                      00281 
+005C   1406           00282                 bsf             PORTB,LED2
+005D   1428           00283                 bsf             STATE,LED2
+                      00284 
+005E   1686           00285                 bsf             PORTB,POWER_UP
+005F   20DB           00286                 call    DELAY_250MS
+0060   1286           00287                 bcf             PORTB,POWER_UP
+0061   0008           00288                 return  
+                      00289 
+0062                  00290 AUTOMATIC1
+                      00291 ;
+                      00292 ; ДЕЛАЕМ ОТКРЫТИЕ ЗАМКА
+                      00293 ;
+0062   204A           00294                 call    OPEN_LOCK
+                      00295 
+0063   300A           00296                 movlw   0x0A;                           10 СЕКУНД ждём
+0064   00A5           00297                 movwf   temp_time
+                      00298 
+0065                  00299 AUTOMATIC_LOOP
+0065   1086           00300                 bcf             PORTB,LED1
+0066   1406           00301                 bsf             PORTB,LED2
+                      00302                 
+0067   20A5           00303                 call    BEEP2           
+0068   20DB           00304                 call    DELAY_250MS
+                      00305 
+0069   1905           00306                 btfsc   PORTA,SENSE1;           skip if b=0
+006A   2874           00307                 goto    AUTOMATIC_NEXT1
+                      00308                 
+                      00309 ;AUTOMATIC_LOOP1                
+006B   1006           00310                 bcf             PORTB,LED2
+006C   1486           00311                 bsf             PORTB,LED1
+                      00312 
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+006D   20A5           00313                 call    BEEP2           
+006E   20E3           00314                 call    DELAY_500MS
+                      00315                 
+006F   1905           00316                 btfsc   PORTA,SENSE1
+0070   2874           00317                 goto    AUTOMATIC_NEXT1
+                      00318 
+0071   0BA5           00319                 decfsz  temp_time,1
+0072   2865           00320                 goto    AUTOMATIC_LOOP
+0073   288D           00321                 goto    SOUND_NOT_OPEN
+                      00322 ;
+                      00323 ; ДЕЛАЕМ ЗАКРЫТИЕ ЗАМКА
+                      00324 ;
+0074                  00325 AUTOMATIC_NEXT1
+0074   3014           00326                 movlw   0x14;                           20 СЕКУНД ждём
+0075   00A5           00327                 movwf   temp_time
+                      00328 
+0076                  00329 AUTOMATIC_NEXT2
+0076   1086           00330                 bcf             PORTB,LED1
+0077   1006           00331                 bcf             PORTB,LED2
+                      00332                 
+0078   209A           00333                 call    BEEP1           
+0079   20E3           00334                 call    DELAY_500MS
+                      00335 
+007A   1D05           00336                 btfss   PORTA,SENSE1;           skip if b=1
+007B   2856           00337                 goto    CLOSE_LOCK
+                      00338                 
+007C   1406           00339                 bsf             PORTB,LED2
+007D   1486           00340                 bsf             PORTB,LED1
+                      00341 
+007E   20A5           00342                 call    BEEP2           
+007F   20E3           00343                 call    DELAY_500MS
+                      00344 
+0080   1D05           00345                 btfss   PORTA,SENSE1
+0081   2856           00346                 goto    CLOSE_LOCK
+                      00347 
+0082   0BA5           00348                 decfsz  temp_time,1
+0083   2876           00349                 goto    AUTOMATIC_NEXT2
+0084   288D           00350                 goto    SOUND_NOT_OPEN
+                      00351 
+0085   0008           00352                 return  
+                      00353 ;//
+                      00354 ;//
+                      00355 ;// ВСЯКИЕ SOUND'ы
+                      00356 ;//
+                      00357 ;//
+                      00358 ;//
+                      00359 ;// Звук: ДВЕРЬ НЕ ЗАКРЫТА
+                      00360 ;//
+                      00361 ;
+0086                  00362 SOUND_SENSE_ERROR
+0086   3004           00363                 movlw   4
+0087   00A7           00364                 movwf   temp_snd2
+0088                  00365 SOUND_SENSE_ERROR1
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0088   20B2           00366                 call    BEEP3;          ~1KHZ
+0089   20D3           00367                 call    DELAY_100MS
+008A   0BA7           00368                 decfsz  temp_snd2,1
+008B   2888           00369                 goto    SOUND_SENSE_ERROR1
+008C   0008           00370                 return
+                      00371 ;//
+                      00372 ;//
+                      00373 ;// Звук ОШИБКА, ДВЕРЬ НЕ ОТКРЫТА
+                      00374 ;//
+                      00375 ;//
+008D                  00376 SOUND_NOT_OPEN
+008D   3003           00377                 movlw   3
+008E   00A7           00378                 movwf   temp_snd2
+008F                  00379 SOUND_NOT_OPEN1
+008F   20A5           00380                 call    BEEP2;          ~1KHZ
+0090   20D3           00381                 call    DELAY_100MS
+                      00382 
+0091   0BA7           00383                 decfsz  temp_snd2,1
+0092   288F           00384                 goto    SOUND_NOT_OPEN1
+                      00385 
+0093   3003           00386                 movlw   3
+0094   00A7           00387                 movwf   temp_snd2
+0095                  00388 SOUND_NOT_OPEN2
+0095   20B2           00389                 call    BEEP3;          ~1KHZ
+0096   20D3           00390                 call    DELAY_100MS
+0097   0BA7           00391                 decfsz  temp_snd2,1
+0098   2895           00392                 goto    SOUND_NOT_OPEN2
+                      00393 
+0099   0008           00394                 return
+                      00395 ;//
+                      00396 ;// Один ПИК с Частотой ~1kHz
+                      00397 ;//
+009A                  00398 BEEP1
+009A   3040           00399                 movlw   0x40
+009B   00A6           00400                 movwf   temp_snd
+009C                  00401 SND1_LOOP
+009C   1586           00402                 bsf             PORTB,BUZZER
+009D   3080           00403                 movlw   0x80
+009E   20CF           00404                 call    delay_XXms
+009F   1186           00405                 bcf             PORTB,BUZZER
+00A0   3060           00406                 movlw   0x60
+00A1   20CF           00407                 call    delay_XXms              
+00A2   0BA6           00408                 decfsz  temp_snd,1
+00A3   289C           00409                 goto    SND1_LOOP
+00A4   0008           00410                 return
+                      00411 ;//
+                      00412 ;// Один ПИК с Частотой ~2kHz
+                      00413 ;//
+                      00414 
+00A5                  00415 BEEP2
+00A5   3020           00416                 movlw   0x20
+00A6   00A6           00417                 movwf   temp_snd
+00A7                  00418 BEEP2_LOOP
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00A7   1586           00419                 bsf             PORTB,BUZZER
+00A8   30FF           00420                 movlw   0xFF
+00A9   20CF           00421                 call    delay_XXms
+00AA   30FF           00422                 movlw   0xFF
+00AB   20CF           00423                 call    delay_XXms
+00AC   1186           00424                 bcf             PORTB,BUZZER
+00AD   30FF           00425                 movlw   0xFF 
+00AE   20CF           00426                 call    delay_XXms
+                      00427 
+00AF   0BA6           00428                 decfsz  temp_snd,1
+00B0   28A7           00429                 goto    BEEP2_LOOP
+00B1   0008           00430                 return
+                      00431 
+00B2                  00432 BEEP3
+00B2   3008           00433                 movlw   0x08
+00B3   00A6           00434                 movwf   temp_snd
+00B4                  00435 BEEP3_LOOP
+00B4   1586           00436                 bsf             PORTB,BUZZER
+00B5   30FF           00437                 movlw   0xFF
+00B6   20CF           00438                 call    delay_XXms
+00B7   30FF           00439                 movlw   0xFF
+00B8   20CF           00440                 call    delay_XXms
+00B9   30FF           00441                 movlw   0xFF
+00BA   20CF           00442                 call    delay_XXms   
+00BB   1186           00443                 bcf             PORTB,BUZZER
+00BC   30FF           00444                 movlw   0xFF
+00BD   20CF           00445                 call    delay_XXms
+00BE   30FF           00446                 movlw   0xFF
+00BF   20CF           00447                 call    delay_XXms
+00C0   30FF           00448                 movlw   0xFF
+00C1   20CF           00449                 call    delay_XXms
+00C2   0BA6           00450                 decfsz  temp_snd,1
+00C3   28B4           00451                 goto    BEEP3_LOOP
+00C4   0008           00452                 return
+                      00453 
+                      00454 ;//
+                      00455 ;//
+                      00456 ;// ВРЕМЕННЫЕ ЗАДЕРЖКИ 
+                      00457 ;//
+                      00458 ;;;
+00C5                  00459 delay_5mks
+00C5   300E           00460                 movlw   0x0E
+00C6   00A2           00461                 movwf   temp1
+00C7                  00462 delay_5mks_1
+00C7   0BA2           00463                 decfsz  temp1,1
+00C8   28C7           00464                 goto    delay_5mks_1
+00C9   0008           00465                 return
+                      00466 
+                      00467 ;//
+                      00468 ;//
+                      00469 ;//
+00CA                  00470 DELAY_500MKS
+00CA   30FF           00471                 movlw   0xFF
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00CB   00A2           00472                 movwf   temp1
+00CC                  00473 DELAY_500MKS_1
+00CC   0BA2           00474                 decfsz  temp1,1
+00CD   28CC           00475                 goto    DELAY_500MKS_1
+00CE   0008           00476                 return
+                      00477 ;//
+                      00478 ;//
+                      00479 ;//
+                      00480 ;;;             входящая переменная movlw 0xXX
+00CF                  00481 delay_XXms
+00CF   00A2           00482                 movwf   temp1
+00D0                  00483 delay_XXms_1
+                      00484                 
+00D0   0BA2           00485                 decfsz  temp1,1
+00D1   28D0           00486                 goto    delay_XXms_1
+00D2   0008           00487                 return
+                      00488 
+00D3                  00489 DELAY_100MS
+                      00490 ; 1 такт = 12,5ns (8 MHZ)
+                      00491 ; 1 сек = 1000000000 ns = 80000000 тактов
+                      00492 ;
+00D3   3080           00493                 movlw   0x80
+00D4   00A2           00494                 movwf   temp1
+00D5   00A3           00495                 movwf   temp2
+                      00496 
+00D6                  00497 DELAY_100MS_1
+00D6   0BA3           00498                 decfsz  temp2,1
+00D7   28DE           00499                 goto    DELAY_250MS_1; 511 тактов
+                      00500 
+00D8   0BA2           00501                 decfsz  temp1,1
+00D9   28DE           00502                 goto    DELAY_250MS_1; 130306 тактов
+                      00503 
+00DA   0008           00504                 return
+                      00505 
+                      00506 
+00DB                  00507 DELAY_250MS
+                      00508 ; 1 такт = 12,5ns (8 MHZ)
+                      00509 ; 1 сек = 1000000000 ns = 80000000 тактов
+                      00510 ;
+00DB   30FF           00511                 movlw   0xFF
+00DC   00A2           00512                 movwf   temp1
+00DD   00A3           00513                 movwf   temp2
+                      00514 
+00DE                  00515 DELAY_250MS_1
+00DE   0BA3           00516                 decfsz  temp2,1
+00DF   28DE           00517                 goto    DELAY_250MS_1; 511 тактов
+                      00518 
+00E0   0BA2           00519                 decfsz  temp1,1
+00E1   28DE           00520                 goto    DELAY_250MS_1; 130306 тактов
+                      00521 
+00E2   0008           00522                 return
+                      00523 
+                      00524 ;//
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00525 ;//
+                      00526 ;//
+00E3                  00527 DELAY_500MS
+                      00528 ; 1 такт = 12,5ns (8 MHZ)
+                      00529 ; 1 сек = 1000000000 ns = 80000000 тактов
+                      00530 ;
+00E3   30FF           00531                 movlw   0xFF
+00E4   00A2           00532                 movwf   temp1
+00E5   00A3           00533                 movwf   temp2
+                      00534 
+00E6                  00535 DELAY_500MS_1
+00E6   0BA3           00536                 decfsz  temp2,1
+00E7   28E6           00537                 goto    DELAY_500MS_1; 511 тактов
+                      00538 
+00E8   0BA2           00539                 decfsz  temp1,1
+00E9   28E6           00540                 goto    DELAY_500MS_1; 130306 тактов
+                      00541 
+00EA   30FF           00542                 movlw   0xFF
+00EB   00A2           00543                 movwf   temp1
+00EC   00A3           00544                 movwf   temp2
+                      00545 
+00ED                  00546 DELAY_500MS_2
+00ED   0BA3           00547                 decfsz  temp2,1
+00EE   28ED           00548                 goto    DELAY_500MS_2; 511 тактов
+                      00549 
+00EF   0BA2           00550                 decfsz  temp1,1
+00F0   28ED           00551                 goto    DELAY_500MS_2; 130306 тактов
+00F1   0008           00552                 return
+                      00553 
+                      00554                 END                             ; Директива "конец программы"
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE 12
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+AUTOMATIC1                        00000062
+AUTOMATIC_LOOP                    00000065
+AUTOMATIC_NEXT1                   00000074
+AUTOMATIC_NEXT2                   00000076
+AUTOMATIC_TIME_1                  00000005
+BEEP1                             0000009A
+BEEP2                             000000A5
+BEEP2_LOOP                        000000A7
+BEEP3                             000000B2
+BEEP3_LOOP                        000000B4
+BUZZER                            00000003
+BUZZER2                           00000004
+Begin                             0000001D
+C                                 00000000
+CLOSE_LOCK                        00000056
+Const_init                        0000001C
+DC                                00000001
+DELAY_100MS                       000000D3
+DELAY_100MS_1                     000000D6
+DELAY_250MS                       000000DB
+DELAY_250MS_1                     000000DE
+DELAY_500MKS                      000000CA
+DELAY_500MKS_1                    000000CC
+DELAY_500MS                       000000E3
+DELAY_500MS_1                     000000E6
+DELAY_500MS_2                     000000ED
+EEADR                             00000009
+EECON1                            00000088
+EECON2                            00000089
+EEDATA                            00000008
+EEIE                              00000006
+EEIF                              00000004
+F                                 00000001
+FSR                               00000004
+GIE                               00000007
+INDF                              00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+KEY1                              00000001
+KEY2                              00000000
+KEY3                              00000003
+LED1                              00000001
+LED2                              00000000
+MOSFET_RELAY                      00000002
+Main_Cikl                         00000041
+NOT_PD                            00000003
+NOT_RBPU                          00000007
+NOT_TO                            00000004
+OPEN_LOCK                         0000004A
+OPTION_REG                        00000081
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE 13
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PCL                               00000002
+PCLATH                            0000000A
+PORTA                             00000005
+PORTB                             00000006
+POWER_UP                          00000005
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+Port_init                         00000006
+Port_reset                        00000012
+RBIE                              00000003
+RBIF                              00000000
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+Ram_init                          00000001
+Reset                             00000000
+SENSE1                            00000002
+SENSE1_OK                         00000059
+SND1_LOOP                         0000009C
+SOUND_NOT_OPEN                    0000008D
+SOUND_NOT_OPEN1                   0000008F
+SOUND_NOT_OPEN2                   00000095
+SOUND_SENSE_ERROR                 00000086
+SOUND_SENSE_ERROR1                00000088
+STATE                             00000028
+STATUS                            00000003
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+TMR0                              00000001
+TRISA                             00000085
+TRISB                             00000086
+Timer_init                        00000014
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+Wait                              00000049
+Z                                 00000002
+_CP_OFF                           00003FFF
+_CP_ON                            0000000F
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FFD
+__16F84A                          00000001
+MPASM  5.36                        DRIVER.ASM   9-17-2012  10:30:50         PAGE 14
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+bigtick_dbl                       0000002A
+bigtick_hi                        0000002B
+bigtick_lo                        0000002C
+delay_5mks                        000000C5
+delay_5mks_1                      000000C7
+delay_XXms                        000000CF
+delay_XXms_1                      000000D0
+keys                              00000029
+safe_s                            00000021
+safe_w                            00000020
+temp1                             00000022
+temp2                             00000023
+temp3                             00000024
+temp_snd                          00000026
+temp_snd2                         00000027
+temp_time                         00000025
+tick                              0000002D
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+00C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XX--------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   242
+Program Memory Words Free:   782
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     3 reported,     0 suppressed
+
+

@@ -1,0 +1,576 @@
+;********************************************************************************
+;										*
+;	Требования:								*
+;										*
+;										*
+;********************************************************************************
+;										*
+;	Замечания:	
+; Контроллер электро-замка с автоматическим режимом закрывания
+;										*
+;										*
+;********************************************************************************
+
+	list      	p=16f84a	; Директива определения типа контроллера
+	#include	<p16f84a.inc>	; Подключаем стандартный файл заголовка MPLAB
+	radix		hex		; Формат чисел по умолчанию - шестнадцатиричный
+	
+;------------------------------------------------------------------------------
+	;Задание слова конфигурации (соответствия аббревиатур битам
+	;			     см. в файле p16F84.inc)
+
+	;__CONFIG _CP_OFF & _WDT_OFF & _PWRTE_ON
+
+;------------------------------------------------------------------------------
+
+;		--- КОНСТАНТЫ ---
+
+;------------------------------------------------------------------------------
+
+;		--- МАКРОКОМАНДЫ ---
+
+;______________________________________________________________________________
+; ПИНЫ ПОРТА <PORTB>
+LED2	equ	0;	pin6
+LED1	equ	1;	pin7
+POWER_UP	equ	5;	
+MOSFET_RELAY	equ	2;	pin9
+BUZZER	equ	3;	pin10
+BUZZER2	equ	4
+
+; ПИНЫ ПОРТА <PORTA>
+KEY2	equ	0;	pin17
+KEY1	equ	1;	pin18
+KEY3	equ	3;	pin1
+SENSE1	equ	2;	pin3
+
+
+AUTOMATIC_TIME_1	equ	5;	Время на закрытие двери
+;--------
+; Start of available RAM.
+;--------
+	cblock	0x20
+		safe_w		;not really temp, used by interrupt svc
+		safe_s		;not really temp, used by interrupt svc
+
+		temp1,temp2,temp3,temp_time,temp_snd,temp_snd2
+		STATE
+		keys
+
+		bigtick_dbl	;incremented each interrupt
+		bigtick_hi
+		bigtick_lo
+		tick		;used by delay
+	endc
+
+;		--- ПУСК ---
+
+		ORG	0		; Вектор сброса - с этого адреса PIC
+					; начинает выполнение программы
+Reset	goto	Begin		; Безусловный переход на начало основной программы
+					; (обходим обработчик прерываний и подпрограммы)
+
+;------------------------------------------------------------------------------
+;		--- ОБРАБОТЧИК ПРЕРЫВАНИЙ ---
+
+;		ORG	4			; Вектор прерываний - переход по этому адресу
+;						; осуществляется аппаратно при установке флага
+;						; запроса на любое незамаскированное прерывание,
+;						; при этом аппаратно сбрасывается бит GIE
+;
+;Interrupt	movwf	safe_w			; Сохранение контекста - содержимого регистров
+;		movf	STATUS,W		; W и STATUS, потому что оно может измениться
+;		movwf	safe_s			; в процессе работы обработчика прерываний
+;
+;		clrwdt
+
+
+;		Здесь будет располагаться сама подпрограмма обработки прерываний
+
+;End_int	movf	safe_s,W		; Восстанавливаем контекст
+;		movwf	STATUS	
+;		swapf	safe_w,F		; Тут приходится хитрить, чтобы сохранить бит Z в STATUS
+;		swapf	safe_w,W		; (movf его может изменить, а swapf - нет)
+;		retfie				; Возврат из обработчика с установкой бита GIE
+
+
+
+Ram_init
+		movlw	0xFC
+		movwf	bigtick_dbl
+
+		movlw	0x00
+		movwf	STATE
+		retlw	0
+;--------
+; unused pins I am setting to be outputs
+;--------
+Port_init	
+		bcf		STATUS,RP1
+		bcf		STATUS,RP0
+
+		clrf	PORTA
+		clrf	PORTB
+
+;		movlw	0x07
+;		movwf	CMCON
+;		movlw	0x00
+;		movwf	VRCON
+
+		bcf		STATUS,RP1
+		bsf		STATUS,RP0
+
+		movlw	b'11111111'
+		movwf 	TRISA
+     
+		movlw	0x00
+		movwf 	TRISB
+
+		bcf		STATUS,RP1		; Выбираем банк0 регистров ОЗУ,
+		bcf		STATUS,RP0		; обнуляя биты выбора банков в регистре STATUS
+		
+Port_reset
+		clrf	PORTB		
+		retlw	0
+
+;--------
+; get timer-based interrupts going
+;--------
+Timer_init	
+		bcf	INTCON,2	;clear TMR0 int flag
+		bcf	INTCON,7	;disable global interrupts
+		bcf	INTCON,5	;disable TMR0 int
+		clrf	TMR0		;clear timer
+		clrwdt			;why is this needed? just do it..
+;		movlw	b'11011000'	;set up timer. prescaler(bit3)bypassed 
+;		option			;send w to option. generate warning.
+		
+		movlw	B'11001000'
+		movwf	OPTION_REG
+
+;		BCF	OPTION_REG,7	;разрешены Pull up резисторы на порту B (~200K)
+
+;		MOVLW	0 ;0x90; B'10010000'
+;        MOVWF	INTCON		;прерывания не используются
+;                MOVLW   0x15            ;настройка таймера 1
+;                MOVWF   T1CON
+
+;                MOVLW   0x0B            ;настройка модуля для сброса таймера 1
+;                MOVWF   CCP1CON; 00001011
+
+;                MOVLW   0x64
+;                MOVWF   CCPR1L;01100100
+
+;                MOVLW   0x57
+;                MOVWF   CCPR1H;
+
+
+
+		retlw	0
+
+;------------------------------------------------------------------------------
+;		--- ОСНОВНАЯ ПРОГРАММА ---
+
+Const_init
+		return
+
+Begin	
+		bcf		STATUS,RP1		; Выбираем банк0 регистров ОЗУ,
+		bcf		STATUS,RP0		; обнуляя биты выбора банков в регистре STATUS
+
+		call	Port_init
+		call	Ram_init
+		call	Const_init
+
+;
+; ТЕСТ звуковой и мигание диодов
+;
+		btfsc	PORTA,SENSE1
+		call	SENSE1_OK
+
+		call	BEEP2
+		call	DELAY_250MS
+		bsf		PORTB,LED1
+		bsf		PORTB,LED2
+
+		call	BEEP1
+		call	DELAY_250MS
+		bcf		PORTB,LED1
+		bcf		PORTB,LED2
+
+		call	BEEP1
+		call	DELAY_250MS
+		bsf		PORTB,LED1
+		bsf		PORTB,LED2
+
+		call	BEEP3
+		bcf		PORTB,LED1
+		bcf		PORTB,LED2
+
+		bcf		PORTB,MOSFET_RELAY
+		bcf		PORTB,POWER_UP
+		
+		call	DELAY_500MKS
+		bsf		PORTB,LED1
+		bsf		PORTB,LED2
+
+		call	DELAY_500MKS
+		bcf		PORTB,LED1
+		bcf		PORTB,LED2
+
+		call	DELAY_500MKS
+		bsf		PORTB,LED1
+		bsf		PORTB,LED2
+
+		call	DELAY_500MKS
+		bcf		PORTB,LED1
+		bcf		PORTB,LED2
+
+
+;		Здесь будем писать наш код...
+
+Main_Cikl
+		movf	PORTA,0
+		movwf	keys
+
+		btfss	keys,KEY1
+		call 	OPEN_LOCK
+
+		btfss	keys,KEY2
+		call 	CLOSE_LOCK
+
+		btfss	keys,KEY3
+		call 	AUTOMATIC1
+
+Wait	goto	Main_Cikl			; Зациклиться до сброса (можно написать проcто goto $)
+;
+; ---======########### Коньец программулинки ############=======-------
+;
+;
+	
+OPEN_LOCK
+		call	BEEP1
+		bcf		PORTB,LED2;		выключить LED2
+		bcf		STATE,LED2
+
+		bsf		PORTB,LED1;		включить LED1
+		bsf		STATE,LED1
+
+		bsf		PORTB,MOSFET_RELAY
+		call	DELAY_250MS
+
+		bsf		PORTB,POWER_UP
+		call	DELAY_250MS
+		bcf		PORTB,POWER_UP
+
+		bcf		PORTB,MOSFET_RELAY
+		return	
+
+CLOSE_LOCK
+
+		btfss	PORTA,SENSE1
+		goto	SENSE1_OK
+
+		goto	SOUND_SENSE_ERROR
+
+SENSE1_OK		
+		call	BEEP1
+
+		bcf		PORTB,LED1
+		bcf		STATE,LED1
+
+		bsf		PORTB,LED2
+		bsf		STATE,LED2
+
+		bsf		PORTB,POWER_UP
+		call	DELAY_250MS
+		bcf		PORTB,POWER_UP
+		return	
+
+AUTOMATIC1
+;
+; ДЕЛАЕМ ОТКРЫТИЕ ЗАМКА
+;
+		call	OPEN_LOCK
+
+		movlw	0x0A;				10 СЕКУНД ждём
+		movwf	temp_time
+
+AUTOMATIC_LOOP
+		bcf		PORTB,LED1
+		bsf		PORTB,LED2
+		
+		call	BEEP2		
+		call	DELAY_250MS
+
+		btfsc	PORTA,SENSE1;		skip if b=0
+		goto	AUTOMATIC_NEXT1
+		
+;AUTOMATIC_LOOP1		
+		bcf		PORTB,LED2
+		bsf		PORTB,LED1
+
+		call	BEEP2		
+		call	DELAY_500MS
+		
+		btfsc	PORTA,SENSE1
+		goto	AUTOMATIC_NEXT1
+
+		decfsz	temp_time,1
+		goto	AUTOMATIC_LOOP
+		goto	SOUND_NOT_OPEN
+;
+; ДЕЛАЕМ ЗАКРЫТИЕ ЗАМКА
+;
+AUTOMATIC_NEXT1
+		movlw	0x14;				20 СЕКУНД ждём
+		movwf	temp_time
+
+AUTOMATIC_NEXT2
+		bcf		PORTB,LED1
+		bcf		PORTB,LED2
+		
+		call	BEEP1		
+		call	DELAY_500MS
+
+		btfss	PORTA,SENSE1;		skip if b=1
+		goto	CLOSE_LOCK
+		
+		bsf		PORTB,LED2
+		bsf		PORTB,LED1
+
+		call	BEEP2		
+		call	DELAY_500MS
+
+		btfss	PORTA,SENSE1
+		goto	CLOSE_LOCK
+
+		decfsz	temp_time,1
+		goto	AUTOMATIC_NEXT2
+		goto	SOUND_NOT_OPEN
+
+		return	
+;//
+;//
+;// ВСЯКИЕ SOUND'ы
+;//
+;//
+;//
+;// Звук: ДВЕРЬ НЕ ЗАКРЫТА
+;//
+;
+SOUND_SENSE_ERROR
+		movlw	4
+		movwf	temp_snd2
+SOUND_SENSE_ERROR1
+		call	BEEP3;		~1KHZ
+		call	DELAY_100MS
+		decfsz	temp_snd2,1
+		goto	SOUND_SENSE_ERROR1
+		return
+;//
+;//
+;// Звук ОШИБКА, ДВЕРЬ НЕ ОТКРЫТА
+;//
+;//
+SOUND_NOT_OPEN
+		movlw	3
+		movwf	temp_snd2
+SOUND_NOT_OPEN1
+		call	BEEP2;		~1KHZ
+		call	DELAY_100MS
+
+		decfsz	temp_snd2,1
+		goto	SOUND_NOT_OPEN1
+
+		movlw	3
+		movwf	temp_snd2
+SOUND_NOT_OPEN2
+		call	BEEP3;		~1KHZ
+		call	DELAY_100MS
+		decfsz	temp_snd2,1
+		goto	SOUND_NOT_OPEN2
+
+		return
+;//
+;// Один ПИК с Частотой ~1kHz
+;//
+BEEP1
+		movlw	0x40
+		movwf	temp_snd
+SND1_LOOP
+		bsf		PORTB,BUZZER
+		movlw	0x80
+		call	delay_XXms
+		bcf		PORTB,BUZZER
+		movlw	0x60
+		call	delay_XXms		
+		decfsz	temp_snd,1
+		goto	SND1_LOOP
+		return
+;//
+;// Один ПИК с Частотой ~2kHz
+;//
+
+BEEP2
+		movlw	0x20
+		movwf	temp_snd
+BEEP2_LOOP
+		bsf		PORTB,BUZZER
+		movlw	0xFF
+		call	delay_XXms
+		movlw	0xFF
+		call	delay_XXms
+		bcf		PORTB,BUZZER
+		movlw	0xFF 
+		call	delay_XXms
+
+		decfsz	temp_snd,1
+		goto	BEEP2_LOOP
+		return
+
+BEEP3
+		movlw	0x08
+		movwf	temp_snd
+BEEP3_LOOP
+		bsf		PORTB,BUZZER
+		movlw	0xFF
+		call	delay_XXms
+		movlw	0xFF
+		call	delay_XXms
+		movlw	0xFF
+		call	delay_XXms   
+		bcf		PORTB,BUZZER
+		movlw	0xFF
+		call	delay_XXms
+		movlw	0xFF
+		call	delay_XXms
+		movlw	0xFF
+ 		call	delay_XXms
+		decfsz	temp_snd,1
+		goto	BEEP3_LOOP
+		return
+
+;//
+;//
+;// ВРЕМЕННЫЕ ЗАДЕРЖКИ 
+;//
+;;;
+delay_5mks
+		movlw	0x0E
+		movwf	temp1
+delay_5mks_1
+		decfsz	temp1,1
+		goto	delay_5mks_1
+		return
+
+;//
+;//
+;//
+DELAY_500MKS
+		movlw	0xFF
+		movwf	temp1
+DELAY_500MKS_1
+		decfsz	temp1,1
+		goto	DELAY_500MKS_1
+		return
+;//
+;//
+;//
+;;;		входящая переменная movlw 0xXX
+delay_XXms
+		movwf	temp1
+delay_XXms_1
+		
+		decfsz	temp1,1
+		goto	delay_XXms_1
+		return
+
+DELAY_100MS
+; 1 такт = 12,5ns (8 MHZ)
+; 1 сек = 1000000000 ns = 80000000 тактов
+;
+		movlw	0x80
+		movwf	temp1
+		movwf	temp2
+
+DELAY_100MS_1
+		decfsz	temp2,1
+		goto	DELAY_250MS_1; 511 тактов
+
+		decfsz	temp1,1
+		goto	DELAY_250MS_1; 130306 тактов
+
+		return
+
+
+DELAY_250MS
+; 1 такт = 12,5ns (8 MHZ)
+; 1 сек = 1000000000 ns = 80000000 тактов
+;
+		movlw	0xFF
+		movwf	temp1
+		movwf	temp2
+
+DELAY_250MS_1
+		decfsz	temp2,1
+		goto	DELAY_250MS_1; 511 тактов
+
+		decfsz	temp1,1
+		goto	DELAY_250MS_1; 130306 тактов
+
+		return
+
+;//
+;//
+;//
+DELAY_500MS
+; 1 такт = 12,5ns (8 MHZ)
+; 1 сек = 1000000000 ns = 80000000 тактов
+;
+		movlw	0xFF
+		movwf	temp1
+		movwf	temp2
+
+DELAY_500MS_1
+		decfsz	temp2,1
+		goto	DELAY_500MS_1; 511 тактов
+
+		decfsz	temp1,1
+		goto	DELAY_500MS_1; 130306 тактов
+
+		movlw	0xFF
+		movwf	temp1
+		movwf	temp2
+
+DELAY_500MS_2
+		decfsz	temp2,1
+		goto	DELAY_500MS_2; 511 тактов
+
+		decfsz	temp1,1
+		goto	DELAY_500MS_2; 130306 тактов
+		return
+
+		END				; Директива "конец программы"
+;
+;
+;del_lo ;
+;del_mi ;
+;del_hi ;простые переменные
+
+;delay_1c movlw D'172'
+;movwf del_lo
+;movlw D'19'
+;movwf del_mi
+;movlw 06h
+;movwf del_hi
+
+;label1
+;decfsz del_lo,F
+;goto label1
+;decfsz del_mi,F
+;goto label1
+;decfsz del_hi,F
+;goto label1
+;nop
+;return

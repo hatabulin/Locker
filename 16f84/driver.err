@@ -1,0 +1,3 @@
+Message[302] E:\CD_WORK\MICROCHIP\PROJECTS\ZAMOK\16F84\DRIVER.ASM 124 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] E:\CD_WORK\MICROCHIP\PROJECTS\ZAMOK\16F84\DRIVER.ASM 127 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] E:\CD_WORK\MICROCHIP\PROJECTS\ZAMOK\16F84\DRIVER.ASM 149 : Register in operand not in bank 0.  Ensure that bank bits are correct.

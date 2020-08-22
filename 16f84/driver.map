@@ -1,0 +1,110 @@
+MPLINK 4.36, Linker
+Linker Map File - Created Mon Sep 17 10:30:52 2012
+
+                                 Section Info
+                  Section       Type    Address   Location Size(Bytes)
+                ---------  ---------  ---------  ---------  ---------
+                   .org_0       code   0x000000    program   0x000000
+                   .org_1       code   0x000000    program   0x0001e4
+
+
+
+                              Program Memory Usage 
+                               Start         End      
+                           ---------   ---------      
+                            0x000000    0x0000f1      
+            242 out of 1093 program addresses used, program memory utilization is 22%
+
+
+
+                              Symbols - Sorted by Name
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+               AUTOMATIC1   0x000062    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           AUTOMATIC_LOOP   0x000065    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          AUTOMATIC_NEXT1   0x000074    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          AUTOMATIC_NEXT2   0x000076    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP1   0x00009a    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP2   0x0000a5    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               BEEP2_LOOP   0x0000a7    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP3   0x0000b2    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               BEEP3_LOOP   0x0000b4    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    Begin   0x00001d    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               CLOSE_LOCK   0x000056    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Const_init   0x00001c    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_100MS   0x0000d3    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_100MS_1   0x0000d6    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_250MS   0x0000db    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_250MS_1   0x0000de    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             DELAY_500MKS   0x0000ca    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           DELAY_500MKS_1   0x0000cc    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_500MS   0x0000e3    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_500MS_1   0x0000e6    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_500MS_2   0x0000ed    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                Main_Cikl   0x000041    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                OPEN_LOCK   0x00004a    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                Port_init   0x000006    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Port_reset   0x000012    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                 Ram_init   0x000001    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    Reset   0x000000    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                SENSE1_OK   0x000059    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                SND1_LOOP   0x00009c    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           SOUND_NOT_OPEN   0x00008d    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          SOUND_NOT_OPEN1   0x00008f    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          SOUND_NOT_OPEN2   0x000095    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+        SOUND_SENSE_ERROR   0x000086    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+       SOUND_SENSE_ERROR1   0x000088    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Timer_init   0x000014    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                     Wait   0x000049    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               delay_5mks   0x0000c5    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             delay_5mks_1   0x0000c7    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               delay_XXms   0x0000cf    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             delay_XXms_1   0x0000d0    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+
+
+
+                              Symbols - Sorted by Address
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+                    Reset   0x000000    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                 Ram_init   0x000001    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                Port_init   0x000006    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Port_reset   0x000012    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Timer_init   0x000014    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               Const_init   0x00001c    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    Begin   0x00001d    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                Main_Cikl   0x000041    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                     Wait   0x000049    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                OPEN_LOCK   0x00004a    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               CLOSE_LOCK   0x000056    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                SENSE1_OK   0x000059    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               AUTOMATIC1   0x000062    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           AUTOMATIC_LOOP   0x000065    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          AUTOMATIC_NEXT1   0x000074    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          AUTOMATIC_NEXT2   0x000076    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+        SOUND_SENSE_ERROR   0x000086    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+       SOUND_SENSE_ERROR1   0x000088    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           SOUND_NOT_OPEN   0x00008d    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          SOUND_NOT_OPEN1   0x00008f    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+          SOUND_NOT_OPEN2   0x000095    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP1   0x00009a    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                SND1_LOOP   0x00009c    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP2   0x0000a5    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               BEEP2_LOOP   0x0000a7    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+                    BEEP3   0x0000b2    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               BEEP3_LOOP   0x0000b4    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               delay_5mks   0x0000c5    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             delay_5mks_1   0x0000c7    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             DELAY_500MKS   0x0000ca    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+           DELAY_500MKS_1   0x0000cc    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+               delay_XXms   0x0000cf    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+             delay_XXms_1   0x0000d0    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_100MS   0x0000d3    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_100MS_1   0x0000d6    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_250MS   0x0000db    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_250MS_1   0x0000de    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+              DELAY_500MS   0x0000e3    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_500MS_1   0x0000e6    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+            DELAY_500MS_2   0x0000ed    program     static E:\CD_WORK\Microchip\Projects\zamok\16f84\driver.asm
+
+

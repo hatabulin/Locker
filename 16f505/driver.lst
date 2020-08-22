@@ -1,0 +1,833 @@
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;********************************************************************************
+                      00002 ;                                                                               *
+                      00003 ;       Требования:                                                             *
+                      00004 ;                                                                               *
+                      00005 ;                                                                               *
+                      00006 ;********************************************************************************
+                      00007 ;                                                                               *
+                      00008 ;       Замечания:      
+                      00009 ; Контроллер электро-замка с автоматическим режимом закрывания
+                      00010 ;                                                                               *
+                      00011 ;                                                                               *
+                      00012 ;********************************************************************************
+                      00013 
+                      00014         list            p=16f505        ; Директива определения типа контроллера
+                      00015         #include        <p16f505.inc>   ; Подключаем стандартный файл заголовка MPLAB
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ;  MPASM PIC16F505 processor include
+                      00005 ; 
+                      00006 ;  (c) Copyright 1999-2013 Microchip Technology, All rights reserved
+                      00007 ;==========================================================================
+                      00008 
+                      00185         LIST
+                      00016         radix           hex             ; Формат чисел по умолчанию - шестнадцатиричный
+                      00017         
+                      00018 ;------------------------------------------------------------------------------
+                      00019         ;Задание слова конфигурации (соответствия аббревиатур битам
+                      00020         ;                            см. в файле p16F84.inc)
+                      00021 
+                      00022         ;__CONFIG _CP_OFF & _WDT_OFF & _PWRTE_ON
+                      00023 
+                      00024 ;------------------------------------------------------------------------------
+                      00025 
+                      00026 ;               --- КОНСТАНТЫ ---
+                      00027 
+                      00028 ;------------------------------------------------------------------------------
+                      00029 
+                      00030 ;               --- МАКРОКОМАНДЫ ---
+                      00031 
+                      00032 ;______________________________________________________________________________
+                      00033 ; ПИНЫ ПОРТА <PORT_C>
+  00000000            00034 LED2    equ     0;      pin10
+  00000001            00035 LED1    equ     1;      pin9
+  00000002            00036 MOSFET_RELAY    equ     2;      pin8
+  00000003            00037 POWER_UP        equ     3; pin7 
+  00000004            00038 SENSE1  equ     4;      pin6
+  00000005            00039 BUZZER  equ     5;      pin5
+                      00040 
+                      00041 ; ПИНЫ ПОРТА <PORT_B>
+  00000002            00042 KEY1    equ     2;      pin11
+  00000001            00043 KEY2    equ     1;      pin12
+  00000000            00044 KEY3    equ     0;      pin13
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00045 
+  00000005            00046 AUTOMATIC_TIME_1        equ     5;      Время на закрытие двери
+                      00047 ;--------
+                      00048 ; Start of available RAM.
+                      00049 ;--------
+                      00050 ;       cblock  0x20
+                      00051 ;               safe_w          ;not really temp, used by interrupt svc
+                      00052 ;               safe_s          ;not really temp, used by interrupt svc
+                      00053 
+                      00054 ;***** VARIABLE DEFINITIONS
+  00000010            00055 temp1   EQU     0x10        ;example variable definition
+  00000011            00056 temp2   EQU     0x11        ;example variable definition
+  00000013            00057 temp_time EQU   0x13
+  00000012            00058 STATE   EQU             0x12;
+  00000013            00059 PORTB_DATA      EQU     0x13
+  00000014            00060 PORTB_STATUS    EQU 0x14
+                      00061 
+                      00062 ;       endc
+                      00063 
+                      00064 ;               --- ПУСК ---
+                      00065 
+                      00066 ;**********************************************************************
+03FF                  00067         ORG     0x3FF             ; processor reset vector
+                      00068 
+                      00069 ; Internal RC calibration value is placed at location 0x3FF by Microchip
+                      00070 ; as a movlw k, where the k is a literal value.
+                      00071 
+0000                  00072         ORG     0x000             ; coding begins here
+                      00073                                         ; начинает выполнение программы
+0000   0A0F           00074 Reset   goto    Begin           ; Безусловный переход на начало основной программы
+                      00075                                         ; (обходим обработчик прерываний и подпрограммы)
+                      00076 
+0001                  00077 Ram_init
+                      00078 ;               bsf             STATUS,PA0
+                      00079 
+0001   0C12           00080                 movlw   STATE; очистка переменной STATE
+0002   0024           00081                 movwf   FSR;
+0003   0060           00082                 clrf    INDF;
+                      00083 
+0004   0540           00084                 bsf             INDF,KEY1
+0005   0800           00085                 retlw   0
+                      00086 ;--------
+                      00087 ; unused pins I am setting to be outputs
+                      00088 ;--------
+0006                  00089 Port_init       
+0006   0067           00090                 clrf    PORTC
+0007   0066           00091                 clrf    PORTB
+                      00092 
+0008   0CD0           00093                 movlw   b'11010000'
+0009   0007           00094                 TRIS    PORTC
+                      00095      
+000A   0CDF           00096                 movlw   b'11011111'
+000B   0006           00097                 TRIS    PORTB
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00098 
+000C                  00099 Port_reset
+000C   0066           00100                 clrf    PORTB
+000D   0067           00101                 clrf    PORTC
+000E   0800           00102                 retlw   0
+                      00103 
+                      00104 ;------------------------------------------------------------------------------
+                      00105 ;               --- ОСНОВНАЯ ПРОГРАММА ---
+                      00106 
+000F                  00107 Begin   
+000F   0906           00108                 call    Port_init
+0010   0901           00109                 call    Ram_init
+                      00110 
+0011   09DF           00111                 call    Beep1
+                      00112 
+                      00113 ;               bcf             PORTC,LED2;             выключить LED2
+                      00114 ;               bsf             PORTC,LED1;             включить LED1
+                      00115 
+0012                  00116 Main_Cikl
+                      00117 ; Проверяем последнее состояние кнопок KEY1, KEY2
+                      00118 ; и соответственно включаем светодиоды 
+                      00119 ;
+0012   0C12           00120                 movlw   STATE
+0013   0024           00121                 movwf   FSR
+                      00122 
+0014   0740           00123                 btfss   INDF,KEY1
+0015   0A17           00124                 goto    Main_Cikl_1
+                      00125 
+0016   0527           00126                 bsf             PORTC,LED1;             включить LED1
+                      00127 
+0017                  00128 Main_Cikl_1
+0017   0720           00129                 btfss   INDF,KEY2
+0018   0A1A           00130                 goto    Main_Cikl_2
+                      00131 
+0019   0507           00132                 bsf             PORTC,LED2;             выключить LED2
+                      00133 
+001A                  00134 Main_Cikl_2
+                      00135 
+                      00136 ; ОСНОВНОЙ ЦИКЛИЩЕ - продолжение !!!
+                      00137 
+001A                  00138 Main_Cikl_LOOP  
+                      00139 
+001A   0924           00140                 call    GET_KEY
+                      00141 
+001B   0C13           00142                 movlw   PORTB_DATA
+001C   0024           00143                 movwf   FSR
+                      00144 
+001D   0740           00145                 btfss   INDF,KEY1
+001E   0A55           00146                 goto    OPEN_LOCK
+                      00147 
+001F   0720           00148                 btfss   INDF,KEY2
+0020   0A64           00149                 goto    CLOSE_LOCK
+                      00150 
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0021   0700           00151                 btfss   INDF,KEY3
+0022   0A8B           00152                 goto    AUTOMATIC1
+                      00153 
+0023   0A1A           00154 Wait    goto    Main_Cikl_LOOP                  ; Зациклиться до сброса (можно написать проcто goto $)
+                      00155 
+                      00156 
+0024                  00157 GET_KEY
+0024   0C13           00158                 movlw   PORTB_DATA
+0025   0024           00159                 movwf   FSR
+                      00160 
+0026   0CFF           00161                 movlw   0xFF
+0027   0020           00162                 movwf   INDF
+                      00163 
+0028   0646           00164                 btfsc   PORTB,KEY1
+0029   0A33           00165                 goto    GET_KEY_NEXT;   если не нажата кнопка KEY1
+                      00166                 
+002A   0C14           00167                 movlw   PORTB_STATUS
+002B   0024           00168                 movwf   FSR
+                      00169 
+002C   0640           00170                 btfsc   INDF,KEY1; проверяем флаг статуса кнопки
+002D   0A54           00171                 goto    GET_KEY_EXIT ; уходим если установлен флаг
+                      00172 
+002E   0540           00173                 bsf             INDF,KEY1
+                      00174 ;               bcf             INDF,KEY2
+                      00175 ;               bcf             INDF,KEY3
+                      00176 
+002F   0C13           00177                 movlw   PORTB_DATA
+0030   0024           00178                 movwf   FSR
+0031   0440           00179                 bcf             INDF,KEY1
+0032   0800           00180                 retlw   0
+                      00181 
+0033                  00182 GET_KEY_NEXT
+0033   0C14           00183                 movlw   PORTB_STATUS
+0034   0024           00184                 movwf   FSR
+0035   0440           00185                 bcf             INDF,KEY1
+                      00186 
+0036   0626           00187                 btfsc   PORTB,KEY2
+0037   0A41           00188                 goto    GET_KEY_NEXT1;  если не нажата кнопка KEY2
+                      00189 
+0038   0C14           00190                 movlw   PORTB_STATUS
+0039   0024           00191                 movwf   FSR
+                      00192                 
+003A   0620           00193                 btfsc   INDF,KEY2; проверяем флаг статуса кнопки
+003B   0A54           00194                 goto    GET_KEY_EXIT ; уходим если установлен флаг
+                      00195 
+003C   0520           00196                 bsf             INDF,KEY2
+                      00197 ;               bcf             INDF,KEY1
+                      00198 ;               bcf             INDF,KEY3
+                      00199 
+003D   0C13           00200                 movlw   PORTB_DATA
+003E   0024           00201                 movwf   FSR
+                      00202 
+003F   0420           00203                 bcf             INDF,KEY2
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0040   0800           00204                 retlw   0
+                      00205 
+0041                  00206 GET_KEY_NEXT1
+0041   0C14           00207                 movlw   PORTB_STATUS
+0042   0024           00208                 movwf   FSR
+0043   0420           00209                 bcf             INDF,KEY2
+                      00210 
+0044   0606           00211                 btfsc   PORTB,KEY3
+0045   0A4F           00212                 goto    GET_KEY_NEXT2;  если не нажата кнопка KEY3
+                      00213 
+0046   0C14           00214                 movlw   PORTB_STATUS
+0047   0024           00215                 movwf   FSR
+                      00216                 
+0048   0600           00217                 btfsc   INDF,KEY3; проверяем флаг статуса кнопки
+0049   0A54           00218                 goto    GET_KEY_EXIT ; уходим если установлен флаг
+                      00219 
+004A   0500           00220                 bsf             INDF,KEY3
+                      00221 ;               bcf             INDF,KEY2
+                      00222 ;               bcf             INDF,KEY1
+                      00223 
+004B   0C13           00224                 movlw   PORTB_DATA
+004C   0024           00225                 movwf   FSR
+004D   0400           00226                 bcf             INDF,KEY3
+004E   0800           00227                 retlw   0
+                      00228 
+004F                  00229 GET_KEY_NEXT2
+004F   0C14           00230                 movlw   PORTB_STATUS
+0050   0024           00231                 movwf   FSR
+                      00232 
+0051   0400           00233                 bcf             INDF,KEY3
+0052   0420           00234                 bcf             INDF,KEY2
+0053   0440           00235                 bcf             INDF,KEY1
+0054                  00236 GET_KEY_EXIT
+0054   0800           00237                 retlw   0
+                      00238 
+0055                  00239 OPEN_LOCK
+0055   0552           00240                 bsf             STATE,KEY1
+0056   0432           00241                 bcf             STATE,KEY2
+0057   0407           00242                 bcf             PORTC,LED2;             выключить LED2
+0058   0527           00243                 bsf             PORTC,LED1;             включить LED1
+                      00244 
+0059   0547           00245                 bsf             PORTC,MOSFET_RELAY
+                      00246 ;               call    DELAY_250MS
+005A   0567           00247                 bsf             PORTC,POWER_UP
+005B   09DF           00248                 call    Beep1
+005C   09CC           00249                 call    DELAY_250MS
+005D   09CC           00250                 call    DELAY_250MS
+005E   0467           00251                 bcf             PORTC,POWER_UP
+005F   0447           00252                 bcf             PORTC,MOSFET_RELAY
+0060   0A12           00253                 goto    Main_Cikl
+                      00254 
+0061                  00255 CLOSE_LOCK2
+0061   09CC           00256                 call    DELAY_250MS
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0062   09CC           00257                 call    DELAY_250MS
+0063   09CC           00258                 call    DELAY_250MS
+                      00259 
+0064                  00260 CLOSE_LOCK
+0064   0787           00261                 btfss   PORTC,SENSE1
+0065   0A6F           00262                 goto    SENSE1_OK
+                      00263 
+0066   09F8           00264                 call    Beep2
+0067   09CC           00265                 call    DELAY_250MS
+0068   09F8           00266                 call    Beep2
+0069   09CC           00267                 call    DELAY_250MS
+006A   09F8           00268                 call    Beep2
+006B   09CC           00269                 call    DELAY_250MS
+006C   09F8           00270                 call    Beep2
+006D   0800           00271                 retlw   0
+                      00272 
+006E   0A79           00273                 goto    Err1
+                      00274 
+006F                  00275 SENSE1_OK               
+006F   09DF           00276                 call    Beep1
+                      00277 
+0070   0532           00278                 bsf             STATE,KEY2
+0071   0452           00279                 bcf             STATE,KEY1
+                      00280 
+0072   0427           00281                 bcf             PORTC,LED1
+0073   0507           00282                 bsf             PORTC,LED2
+                      00283 
+0074   0567           00284                 bsf             PORTC,POWER_UP
+0075   09CC           00285                 call    DELAY_250MS
+0076   09CC           00286                 call    DELAY_250MS
+0077   0467           00287                 bcf             PORTC,POWER_UP
+0078   0A12           00288                 goto    Main_Cikl
+                      00289 
+0079                  00290 Err1
+0079   0C13           00291                 movlw   temp_time
+007A   0024           00292                 movwf   FSR
+                      00293 
+007B   0C03           00294                 movlw   0x03
+007C   0020           00295                 movwf   INDF
+                      00296 
+007D                  00297 Err1_1
+007D   0527           00298                 bsf             PORTC,LED1;             включить LED1
+007E   09CC           00299                 call    DELAY_250MS
+007F   0507           00300                 bsf             PORTC,LED2;             включить LED1
+0080   09CC           00301                 call    DELAY_250MS
+                      00302 
+0081   09F8           00303                 call    Beep2
+                      00304 
+0082   0427           00305                 bcf             PORTC,LED1;             выключить LED1
+0083   09CC           00306                 call    DELAY_250MS
+0084   0407           00307                 bcf             PORTC,LED2;             выключить LED1
+0085   09CC           00308                 call    DELAY_250MS
+                      00309 
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0086   0C13           00310                 movlw   temp_time
+0087   0024           00311                 movwf   FSR
+                      00312                 
+0088   02E0           00313                 decfsz  INDF,1
+0089   0A7D           00314                 goto    Err1_1
+008A   0A12           00315                 goto    Main_Cikl
+                      00316 
+008B                  00317 AUTOMATIC1
+                      00318 ;
+                      00319 ; ДЕЛАЕМ ОТКРЫТИЕ ЗАМКА
+                      00320 ;
+                      00321 ;               call    OPEN_LOCK
+                      00322 ; === процедура открытия замка ===
+                      00323 
+                      00324 
+008B   0552           00325                 bsf             STATE,KEY1
+008C   0432           00326                 bcf             STATE,KEY2
+008D   09DF           00327                 call    Beep1
+008E   0407           00328                 bcf             PORTC,LED2;             выключить LED2
+008F   0527           00329                 bsf             PORTC,LED1;             включить LED1
+                      00330 
+0090   0547           00331                 bsf             PORTC,MOSFET_RELAY
+0091   09CC           00332                 call    DELAY_250MS
+0092   09CC           00333                 call    DELAY_250MS
+                      00334 
+0093   0567           00335                 bsf             PORTC,POWER_UP
+0094   09CC           00336                 call    DELAY_250MS
+0095   09CC           00337                 call    DELAY_250MS
+0096   0467           00338                 bcf             PORTC,POWER_UP
+                      00339 
+0097   0447           00340                 bcf             PORTC,MOSFET_RELAY
+                      00341 ;=======================================
+                      00342 
+0098   0C13           00343                 movlw   temp_time
+0099   0024           00344                 movwf   FSR
+                      00345 
+009A   0C14           00346                 movlw   0x14
+009B   0020           00347                 movwf   INDF
+                      00348 
+009C                  00349 AUTOMATIC_LOOP
+009C   0427           00350                 bcf             PORTC,LED1
+009D   0507           00351                 bsf             PORTC,LED2
+                      00352                 
+                      00353 ;               call    BEEP2           
+009E   09CC           00354                 call    DELAY_250MS
+                      00355 ;               call    DELAY_250MS
+009F   09DF           00356                 call    Beep1
+                      00357 
+00A0   0687           00358                 btfsc   PORTC,SENSE1;           skip if b=0
+00A1   0AB2           00359                 goto    AUTOMATIC_NEXT1
+                      00360                 
+00A2   0407           00361                 bcf             PORTC,LED2
+00A3   0527           00362                 bsf             PORTC,LED1
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00363 
+                      00364 ;               call    BEEP2           
+                      00365 ;               call    DELAY_250MS
+00A4   09CC           00366                 call    DELAY_250MS
+00A5   09DF           00367                 call    Beep1
+                      00368 
+00A6   0C13           00369                 movlw   temp_time
+00A7   0024           00370                 movwf   FSR
+                      00371                 
+00A8   0687           00372                 btfsc   PORTC,SENSE1
+00A9   0AB2           00373                 goto    AUTOMATIC_NEXT1
+                      00374 
+00AA   0924           00375                 call    GET_KEY
+00AB   0C13           00376                 movlw   PORTB_DATA
+00AC   0024           00377                 movwf   FSR
+                      00378 
+00AD   0700           00379                 btfss   INDF,KEY3
+00AE   0AC9           00380                 goto    AUTOMATIC_EXIT;         выход из автоматики
+                      00381 
+00AF   02E0           00382                 decfsz  INDF,1
+00B0   0A9C           00383                 goto    AUTOMATIC_LOOP
+                      00384 
+00B1   0A79           00385                 goto    Err1
+                      00386 
+                      00387 ;
+                      00388 ; ДЕЛАЕМ ЗАКРЫТИЕ ЗАМКА
+                      00389 ;
+00B2                  00390 AUTOMATIC_NEXT1
+00B2   0C13           00391                 movlw   temp_time
+00B3   0024           00392                 movwf   FSR
+                      00393 
+00B4   0C14           00394                 movlw   0x14
+00B5   0020           00395                 movwf   INDF
+                      00396 
+00B6                  00397 AUTOMATIC_NEXT2
+00B6   0427           00398                 bcf             PORTC,LED1
+00B7   0407           00399                 bcf             PORTC,LED2
+                      00400                 
+                      00401 ;               call    BEEP1           
+00B8   09CC           00402                 call    DELAY_250MS
+00B9   09DF           00403                 call    Beep1
+00BA   09DF           00404                 call    Beep1
+                      00405 
+00BB   0787           00406                 btfss   PORTC,SENSE1
+00BC   0A61           00407                 goto    CLOSE_LOCK2
+                      00408 
+00BD   09CC           00409                 call    DELAY_250MS
+                      00410 
+00BE   0507           00411                 bsf             PORTC,LED2
+00BF   0527           00412                 bsf             PORTC,LED1
+                      00413 
+                      00414 ;               call    BEEP2           
+00C0   09CC           00415                 call    DELAY_250MS
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00416 
+00C1   0787           00417                 btfss   PORTC,SENSE1
+00C2   0A61           00418                 goto    CLOSE_LOCK2
+                      00419 
+00C3   09CC           00420                 call    DELAY_250MS
+                      00421 
+00C4   0C13           00422                 movlw   temp_time
+00C5   0024           00423                 movwf   FSR
+                      00424 
+00C6   02E0           00425                 decfsz  INDF,1
+00C7   0AB6           00426                 goto    AUTOMATIC_NEXT2
+00C8   0A79           00427                 goto    Err1
+                      00428 
+00C9                  00429 AUTOMATIC_EXIT
+00C9   09DF           00430                 call    Beep1
+00CA   0A12           00431                 goto    Main_Cikl
+                      00432 
+                      00433 ;//
+                      00434 ;//
+                      00435 ;// Звук ОШИБКА, ДВЕРЬ НЕ ОТКРЫТА
+                      00436 ;//
+                      00437 ;//
+00CB                  00438 SOUND_NOT_OPEN
+                      00439 ;               movlw   3
+                      00440 ;               movwf   temp_snd2
+                      00441 ;SOUND_NOT_OPEN1
+                      00442 ;               call    BEEP2;          ~1KHZ
+                      00443 ;               call    DELAY_100MS
+                      00444 ;
+                      00445 ;               decfsz  temp_snd2,1
+                      00446 ;               goto    SOUND_NOT_OPEN1
+                      00447 ;
+                      00448 ;               movlw   3
+                      00449 ;               movwf   temp_snd2
+                      00450 ;SOUND_NOT_OPEN2
+                      00451 ;               call    BEEP3;          ~1KHZ
+                      00452 ;               call    DELAY_100MS
+                      00453 ;               decfsz  temp_snd2,1
+                      00454 ;               goto    SOUND_NOT_OPEN2
+                      00455 
+Warning[227]: Substituting RETLW 0 for RETURN pseudo-op
+00CB   0800           00456                 return
+                      00457 
+                      00458 ;
+                      00459 ; ---======########### Коньец программулинки ############=======-------
+                      00460 ;movlw
+                      00461 
+00CC                  00462 DELAY_250MS
+                      00463 ; 1 такт = 12,5ns (8 MHZ)
+                      00464 ; 1 сек = 1000000000 ns = 80000000 тактов
+                      00465 ;
+00CC   0C10           00466                 movlw   temp1
+00CD   0024           00467                 movwf   FSR
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00468 
+00CE   0CFF           00469                 movlw   0xFF
+00CF   0020           00470                 movwf   INDF
+                      00471 
+00D0   0C11           00472                 movlw   temp2
+00D1   0024           00473                 movwf   FSR
+                      00474 
+00D2   0CFF           00475                 movlw   0xFF
+00D3   0020           00476                 movwf   INDF
+                      00477 
+00D4                  00478 DELAY_250MS_1
+00D4   0C11           00479                 movlw   temp2
+00D5   0024           00480                 movwf   FSR
+00D6                  00481 DELAY_250MS_11
+00D6   02E0           00482                 decfsz  INDF,1
+00D7   0AD6           00483                 goto    DELAY_250MS_11; 511 тактов
+                      00484 
+00D8   0CFF           00485                 movlw   0xFF
+00D9   0020           00486                 movwf   INDF
+                      00487 
+00DA   0C10           00488                 movlw   temp1
+00DB   0024           00489                 movwf   FSR
+                      00490 
+00DC   02E0           00491                 decfsz  INDF,1
+00DD   0AD4           00492                 goto    DELAY_250MS_1; 130306 тактов
+                      00493 
+00DE   0800           00494                 retlw   0
+                      00495 
+00DF                  00496 Beep1
+00DF   04A7           00497                 bcf             PORTC,BUZZER                            
+00E0   04A6           00498                 bcf             PORTB,BUZZER
+00E1   0C10           00499                 movlw   temp1
+00E2   0024           00500                 movwf   FSR
+                      00501 
+00E3   0C40           00502                 movlw   0x40
+00E4   0020           00503                 movwf   INDF
+                      00504 
+00E5                  00505 Beep1_1
+00E5   0C11           00506                 movlw   temp2
+00E6   0024           00507                 movwf   FSR
+                      00508 
+00E7   0C70           00509                 movlw   0x70
+00E8   0020           00510                 movwf   INDF
+                      00511 
+00E9   05A7           00512                 bsf             PORTC,BUZZER
+00EA   05A6           00513                 bsf             PORTB,BUZZER                            
+00EB                  00514 Beep1_11
+00EB   02E0           00515                 decfsz  INDF,1
+00EC   0AEB           00516                 goto    Beep1_11; 511 тактов
+                      00517 
+00ED   0C70           00518                 movlw   0x70
+00EE   0020           00519                 movwf   INDF
+                      00520 
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00EF   04A7           00521                 bcf             PORTC,BUZZER
+00F0   04A6           00522                 bcf             PORTB,BUZZER
+00F1                  00523 Beep1_12
+00F1   02E0           00524                 decfsz  INDF,1
+00F2   0AF1           00525                 goto    Beep1_12; 511 тактов
+                      00526 
+00F3   0C10           00527                 movlw   temp1
+00F4   0024           00528                 movwf   FSR
+                      00529 
+00F5   02E0           00530                 decfsz  INDF,1
+00F6   0AE5           00531                 goto    Beep1_1; 130306 тактов
+00F7   0800           00532                 retlw   0
+                      00533 
+00F8                  00534 Beep2
+00F8   04A7           00535                 bcf             PORTC,BUZZER                            
+00F9   04A6           00536                 bcf             PORTB,BUZZER
+00FA   0C10           00537                 movlw   temp1
+00FB   0024           00538                 movwf   FSR
+                      00539 
+00FC   0C40           00540                 movlw   0x40
+00FD   0020           00541                 movwf   INDF
+                      00542 
+00FE                  00543 Beep2_1
+00FE   0C11           00544                 movlw   temp2
+00FF   0024           00545                 movwf   FSR
+                      00546 
+0100   0CF0           00547                 movlw   0xF0
+0101   0020           00548                 movwf   INDF
+                      00549 
+0102   05A7           00550                 bsf             PORTC,BUZZER
+0103   05A6           00551                 bsf             PORTB,BUZZER                            
+0104                  00552 Beep2_11
+0104   02E0           00553                 decfsz  INDF,1
+0105   0B04           00554                 goto    Beep2_11; 511 тактов
+                      00555 
+0106   0CF0           00556                 movlw   0xF0
+0107   0020           00557                 movwf   INDF
+                      00558 
+0108   04A7           00559                 bcf             PORTC,BUZZER
+0109   04A6           00560                 bcf             PORTB,BUZZER
+010A                  00561 Beep2_12
+010A   02E0           00562                 decfsz  INDF,1
+010B   0B0A           00563                 goto    Beep2_12; 511 тактов
+                      00564 
+010C   0C10           00565                 movlw   temp1
+010D   0024           00566                 movwf   FSR
+                      00567 
+010E   02E0           00568                 decfsz  INDF,1
+010F   0AFE           00569                 goto    Beep2_1; 130306 тактов
+0110   0800           00570                 retlw   0
+                      00571 
+                      00572                 END
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 12
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+AUTOMATIC1                        0000008B
+AUTOMATIC_EXIT                    000000C9
+AUTOMATIC_LOOP                    0000009C
+AUTOMATIC_NEXT1                   000000B2
+AUTOMATIC_NEXT2                   000000B6
+AUTOMATIC_TIME_1                  00000005
+BUZZER                            00000005
+Beep1                             000000DF
+Beep1_1                           000000E5
+Beep1_11                          000000EB
+Beep1_12                          000000F1
+Beep2                             000000F8
+Beep2_1                           000000FE
+Beep2_11                          00000104
+Beep2_12                          0000010A
+Begin                             0000000F
+C                                 00000000
+CAL0                              00000001
+CAL1                              00000002
+CAL2                              00000003
+CAL3                              00000004
+CAL4                              00000005
+CAL5                              00000006
+CAL6                              00000007
+CLOSE_LOCK                        00000064
+CLOSE_LOCK2                       00000061
+DC                                00000001
+DELAY_250MS                       000000CC
+DELAY_250MS_1                     000000D4
+DELAY_250MS_11                    000000D6
+Err1                              00000079
+Err1_1                            0000007D
+F                                 00000001
+FSR                               00000004
+GET_KEY                           00000024
+GET_KEY_EXIT                      00000054
+GET_KEY_NEXT                      00000033
+GET_KEY_NEXT1                     00000041
+GET_KEY_NEXT2                     0000004F
+INDF                              00000000
+KEY1                              00000002
+KEY2                              00000001
+KEY3                              00000000
+LED1                              00000001
+LED2                              00000000
+MOSFET_RELAY                      00000002
+Main_Cikl                         00000012
+Main_Cikl_1                       00000017
+Main_Cikl_2                       0000001A
+Main_Cikl_LOOP                    0000001A
+NOT_GPPU                          00000006
+NOT_GPWU                          00000007
+NOT_PD                            00000003
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 13
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NOT_RBPU                          00000006
+NOT_RBWU                          00000007
+NOT_TO                            00000004
+OPEN_LOCK                         00000055
+OSCCAL                            00000005
+PA0                               00000005
+PCL                               00000002
+PORTB                             00000006
+PORTB_DATA                        00000013
+PORTB_STATUS                      00000014
+PORTC                             00000007
+POWER_UP                          00000003
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+Port_init                         00000006
+Port_reset                        0000000C
+RB0                               00000000
+RB1                               00000001
+RB2                               00000002
+RB3                               00000003
+RB4                               00000004
+RB5                               00000005
+RBWUF                             00000007
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+RC3                               00000003
+RC4                               00000004
+RC5                               00000005
+Ram_init                          00000001
+Reset                             00000000
+SENSE1                            00000004
+SENSE1_OK                         0000006F
+SOUND_NOT_OPEN                    000000CB
+STATE                             00000012
+STATUS                            00000003
+T0CS                              00000005
+T0SE                              00000004
+TMR0                              00000001
+TRISB0                            00000000
+TRISB1                            00000001
+TRISB2                            00000002
+TRISB3                            00000003
+TRISB4                            00000004
+TRISB5                            00000005
+TRISC0                            00000000
+TRISC1                            00000001
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 14
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+W                                 00000000
+Wait                              00000023
+Z                                 00000002
+_CONFIG                           00000FFF
+_CP_OFF                           00000FFF
+_CP_ON                            00000FEF
+_EC_RB4EN                         00000FFB
+_ExtRC_OSC_CLKOUTEN               00000FFF
+_ExtRC_OSC_RB4EN                  00000FFE
+_HS_OSC                           00000FFA
+_IDLOC0                           00000400
+_IDLOC1                           00000401
+_IDLOC2                           00000402
+_IDLOC3                           00000403
+_IntRC_OSC_CLKOUTEN               00000FFD
+_IntRC_OSC_RB4EN                  00000FFC
+_LP_OSC                           00000FF8
+_MCLRE_OFF                        00000FDF
+_MCLRE_ON                         00000FFF
+_OSC_EC                           00000FFB
+_OSC_ExtRC_CLKOUTEN               00000FFF
+_OSC_ExtRC_RB4EN                  00000FFE
+_OSC_HS                           00000FFA
+_OSC_IntRC_CLKOUTEN               00000FFD
+_OSC_IntRC_RB4EN                  00000FFC
+_OSC_LP                           00000FF8
+_OSC_XT                           00000FF9
+_WDT_OFF                          00000FF7
+_WDT_ON                           00000FFF
+_XT_OSC                           00000FF9
+__16F505                          00000001
+temp1                             00000010
+temp2                             00000011
+temp_time                         00000013
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+00C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0100 : XXXXXXXXXXXXXXXX X--------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   273
+Program Memory Words Free:   751
+
+
+MPASM  5.51                        DRIVER.ASM   12-1-2018  21:57:16         PAGE 15
+
+
+
+
+
+Errors   :     0
+Warnings :     1 reported,     0 suppressed
+Messages :     0 reported,     0 suppressed
+
+

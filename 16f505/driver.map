@@ -1,0 +1,107 @@
+MPLINK 4.49, Linker
+Linker Map File - Created Sat Dec 01 21:57:17 2018
+
+                                 Section Info
+                  Section       Type    Address   Location Size(Bytes)
+                ---------  ---------  ---------  ---------  ---------
+                   .org_0       code   0x000000    program   0x000000
+                   .org_2       code   0x000000    program   0x000222
+                   .org_1       code   0x0003ff    program   0x000000
+
+
+
+                              Program Memory Usage 
+                               Start         End      
+                           ---------   ---------      
+                            0x000000    0x000110      
+            273 out of 1029 program addresses used, program memory utilization is 26%
+
+
+
+                              Symbols - Sorted by Name
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+               AUTOMATIC1   0x00008b    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           AUTOMATIC_EXIT   0x0000c9    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           AUTOMATIC_LOOP   0x00009c    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+          AUTOMATIC_NEXT1   0x0000b2    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+          AUTOMATIC_NEXT2   0x0000b6    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Beep1   0x0000df    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  Beep1_1   0x0000e5    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep1_11   0x0000eb    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep1_12   0x0000f1    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Beep2   0x0000f8    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  Beep2_1   0x0000fe    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep2_11   0x000104    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep2_12   0x00010a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Begin   0x00000f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+               CLOSE_LOCK   0x000064    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              CLOSE_LOCK2   0x000061    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              DELAY_250MS   0x0000cc    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            DELAY_250MS_1   0x0000d4    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           DELAY_250MS_11   0x0000d6    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                     Err1   0x000079    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                   Err1_1   0x00007d    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  GET_KEY   0x000024    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+             GET_KEY_EXIT   0x000054    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+             GET_KEY_NEXT   0x000033    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            GET_KEY_NEXT1   0x000041    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            GET_KEY_NEXT2   0x00004f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                Main_Cikl   0x000012    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              Main_Cikl_1   0x000017    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              Main_Cikl_2   0x00001a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           Main_Cikl_LOOP   0x00001a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                OPEN_LOCK   0x000055    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                Port_init   0x000006    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+               Port_reset   0x00000c    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Ram_init   0x000001    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Reset   0x000000    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                SENSE1_OK   0x00006f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           SOUND_NOT_OPEN   0x0000cb    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                     Wait   0x000023    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+
+
+
+                              Symbols - Sorted by Address
+                     Name    Address   Location    Storage File                     
+                ---------  ---------  ---------  --------- ---------                
+                    Reset   0x000000    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Ram_init   0x000001    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                Port_init   0x000006    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+               Port_reset   0x00000c    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Begin   0x00000f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                Main_Cikl   0x000012    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              Main_Cikl_1   0x000017    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           Main_Cikl_LOOP   0x00001a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              Main_Cikl_2   0x00001a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                     Wait   0x000023    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  GET_KEY   0x000024    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+             GET_KEY_NEXT   0x000033    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            GET_KEY_NEXT1   0x000041    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            GET_KEY_NEXT2   0x00004f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+             GET_KEY_EXIT   0x000054    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                OPEN_LOCK   0x000055    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              CLOSE_LOCK2   0x000061    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+               CLOSE_LOCK   0x000064    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                SENSE1_OK   0x00006f    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                     Err1   0x000079    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                   Err1_1   0x00007d    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+               AUTOMATIC1   0x00008b    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           AUTOMATIC_LOOP   0x00009c    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+          AUTOMATIC_NEXT1   0x0000b2    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+          AUTOMATIC_NEXT2   0x0000b6    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           AUTOMATIC_EXIT   0x0000c9    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           SOUND_NOT_OPEN   0x0000cb    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+              DELAY_250MS   0x0000cc    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+            DELAY_250MS_1   0x0000d4    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+           DELAY_250MS_11   0x0000d6    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Beep1   0x0000df    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  Beep1_1   0x0000e5    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep1_11   0x0000eb    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep1_12   0x0000f1    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                    Beep2   0x0000f8    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                  Beep2_1   0x0000fe    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep2_11   0x000104    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+                 Beep2_12   0x00010a    program     static D:\work\!microchip\!Projects\zamok\16f505\driver.asm
+
+
